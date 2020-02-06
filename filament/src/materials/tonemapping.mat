@@ -7,8 +7,17 @@ material {
             precision: high
         },
         {
+            type : sampler2d,
+            name : bloomBuffer,
+            precision: high
+        },
+        {
             type : int,
             name : dithering
+        },
+        {
+            type : float,
+            name : bloom
         },
         {
             type : int,
@@ -34,9 +43,18 @@ fragment {
         return texelFetch(materialParams_colorBuffer, uv, 0);
     }
 
+    vec3 bloom(const vec3 color) {
+        if (materialParams.bloom > 0.0) {
+            vec3 blurred = texelFetch(materialParams_bloomBuffer, ivec2(getUV()), 0).rgb;
+            return color + blurred * materialParams.bloom;
+        }
+        return color;
+    }
+
     vec4 resolve() {
 #if POST_PROCESS_OPAQUE
         vec4 color = vec4(resolveFragment(ivec2(getUV())), 1.0);
+        color.rgb  = bloom(color.rgb);
         color.rgb  = tonemap(color.rgb);
         color.rgb  = OECF(color.rgb);
         if (materialParams.fxaa > 0) {
@@ -45,6 +63,7 @@ fragment {
 #else
         vec4 color = resolveAlphaFragment(ivec2(getUV()));
         color.rgb /= color.a + FLT_EPS;
+        color.rgb  = bloom(color.rgb);
         color.rgb  = tonemap(color.rgb);
         color.rgb  = OECF(color.rgb);
         color.rgb *= color.a + FLT_EPS;

@@ -190,8 +190,12 @@ FrameGraphId <FrameGraphTexture> PostProcessManager::toneMapping(FrameGraph& fg,
     struct PostProcessToneMapping {
         FrameGraphId<FrameGraphTexture> input;
         FrameGraphId<FrameGraphTexture> output;
+        FrameGraphId<FrameGraphTexture> bloom;
         FrameGraphRenderTargetHandle rt;
     };
+
+
+    auto bloom = gaussianBlurPass(fg, input, 0, 0, 81, (81 + 1) / 4.0f);
 
     auto& ppToneMapping = fg.addPass<PostProcessToneMapping>("tonemapping",
             [&](FrameGraph::Builder& builder, PostProcessToneMapping& data) {
@@ -203,14 +207,18 @@ FrameGraphId <FrameGraphTexture> PostProcessManager::toneMapping(FrameGraph& fg,
                         .format = outFormat
                 });
                 data.rt = builder.createRenderTarget(data.output);
+                data.bloom = builder.sample(bloom);
             },
             [=](FrameGraphPassResources const& resources,
                     PostProcessToneMapping const& data, DriverApi& driver) {
                 auto const& color = resources.getTexture(data.input);
+                auto const& bloom = resources.getTexture(data.bloom);
 
                 FMaterialInstance* pInstance = mTonemapping.getMaterialInstance();
                 pInstance->setParameter("colorBuffer", color, {});
+                pInstance->setParameter("bloomBuffer", bloom, {});
                 pInstance->setParameter("dithering", dithering);
+                pInstance->setParameter("bloom", 0.04f);
                 pInstance->setParameter("fxaa", fxaa);
                 pInstance->commit(driver);
 
